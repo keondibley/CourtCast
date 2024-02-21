@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib as plt
-games_data= pd.read_csv("/Users/isabellapepich/Desktop/sports_betting/games.csv")
+games_data= pd.read_csv("games.csv")
 headers = list(games_data.columns)
 games_data = games_data.loc[games_data.SEASON >= 2015]
 games_data.sort_values(by=["GAME_DATE_EST"])        
