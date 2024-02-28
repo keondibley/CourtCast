@@ -1,0 +1,73 @@
+# disclaimer: code is very basic and doesn't run correctly T_T
+
+# Multiple Linear Regression Model using Home Team wins as the dependent variable
+# # of points for home, field goal percentage for home, the the three point field goal percentage
+# for home, the number of assists by the home team, and the number of rebounds by the home team
+
+#### MODEL IDEAS WE HAD BUT COULDN'T IMPLEMENT ####
+# Basing the win percentage off of a team's percentage of wins
+# Couldn't figure out how to align the games with their win percentage standing
+# Thought maybe you could align them based on game date as well as team ID but couldn't
+# figure out how to code that
+
+
+
+import pandas as pd
+import matplotlib as plt
+import sklearn as sk
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error 
+from sklearn import preprocessing
+
+
+games_data = pd.read_csv("/Users/isabellapepich/Desktop/sports_betting/games.csv")
+headers = list(games_data.columns)
+games_data = games_data.loc[games_data.SEASON >= 2011]
+games_data.sort_values(by=["GAME_DATE_EST"])        
+games_data = games_data.reset_index()
+
+sns.scatterplot(x='FG_PCT_home', 
+                y='HOME_TEAM_WINS', data = games_data)
+
+X = games_data[['PTS_home', 'FG_PCT_home', 'FT_PCT_home', 'FG3_PCT_home', 'AST_home', 'REB_home']] 
+y = games_data['HOME_TEAM_WINS']
+  
+print(X) 
+print(y) 
+  
+# creating train and test sets 
+X_train, X_test, y_train, y_test = train_test_split( 
+    X, y, test_size=0.3, random_state=101) 
+  
+# creating a regression model 
+model = LinearRegression()
+print(model)
+  
+# fitting the model 
+model.fit(X_train, y_train) 
+
+# making predictions 
+predictions = model.predict(X_test) 
+print(predictions)
+
+# model evaluation 
+print('mean_squared_error : ', mean_squared_error(y_test, predictions)) 
+print('mean_absolute_error : ', mean_absolute_error(y_test, predictions)) 
+
+# me trying to plot and failing
+
+import matplotlib.pyplot as plt
+plt.style.use('default')
+plt.style.use('ggplot')
+
+fig, ax = plt.subplots(figsize=(8, 4))
+
+ax.plot(X, y, color='k', label='Regression model')
+ax.scatter(X, y, edgecolor='k', facecolor='grey', alpha=0.7, label='Sample data')
+ax.set_ylabel('Home Team Win (1) Loss (0)', fontsize=14)
+ax.set_xlabel('Home Team Stats', fontsize=14)
+ax.legend(facecolor='white', fontsize=11)
+
+fig.tight_layout()
