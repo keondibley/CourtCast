@@ -1,0 +1,105 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression # feature selection
+import statsmodels.api as sm
+from sklearn import metrics
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+
+
+
+games = pd.read_csv("C:/Users/Keon School/Downloads/nba games/games.csv")
+ranking = pd.read_csv('C:/Users/Keon School/Downloads/nba games/ranking.csv')
+
+
+#print(games.isnull().sum())# 99 null values for some variables
+
+#print((games.isnull().sum()/(len(games)))*100) # very low percentage of null values, 0.37% for certain columns
+
+for col in games.columns:
+   print(col)
+
+
+#print(count) # 29 duplicate values of GAME_ID
+
+#print(games.GAME_ID.nunique()) # 26622
+#print(len(games)) #26651, 29 duplicate values of GAME_ID
+
+
+pie = games.duplicated(subset=['GAME_ID'], keep=False)
+
+count = 0
+
+for i in range(len(pie)):
+    if pie[i] == True:
+        #print(games['GAME_ID'][i], games['PTS_away'][i], games['PTS_home'][i])
+        count += 1
+
+#print(count)
+#print(pie[3102:3131])
+#print(games[3102:3131])
+
+games = games.drop_duplicates(subset=['GAME_ID'])
+#print(len(games)) # length shortened to 26622
+
+#games = games.drop(['GAME_DATE_EST'], axis=1)
+games = games.drop(['GAME_STATUS_TEXT'], axis=1) #irrelevant columns to prediction, down to 19 columns
+games = games.drop(['TEAM_ID_home'], axis=1)
+games = games.drop(['TEAM_ID_away'], axis=1) # duplicate columns, down to 17
+
+
+#print(games.HOME_TEAM_ID.nunique()) 30 unique values
+#print(games.VISITOR_TEAM_ID.nunique()) 30 unique values
+pd.set_option('display.max_columns', None)
+
+#print(games.describe().T.apply(lambda x: x.apply('{0:.2f}'.format))) # home slightly higher than away for almost all statistical categories
+# mean of home team wins is 0.59, home wins a significant amount more
+
+games.dropna(subset=['PTS_home'], inplace=True)
+games.dropna(subset=['PTS_away'], inplace=True)
+
+data = [games['PTS_home'], games['PTS_away']]
+
+bp = plt.boxplot(data)
+#plt.show()
+
+
+
+#Logistic Regression
+
+cols=['PTS_home', 'FG_PCT_home', 'FT_PCT_home', 'FG3_PCT_home', 'AST_home',
+      'REB_home', 'PTS_away', 'FG_PCT_away', 'FT_PCT_away', 'FG3_PCT_away', 'AST_away', 'REB_away']
+X = games[cols]
+y = games['HOME_TEAM_WINS']
+
+logit_model = sm.Logit(y,X)
+result = logit_model.fit(method='bfgs')
+print(result.summary2())
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+logreg = LogisticRegression()
+logreg.fit(X_train, y_train)
+
+y_pred = logreg.predict(X_test)
+print('Accuracy of logistic regression classifier on test set: {:.2f}'.format(logreg.score(X_test, y_test)))
+
+# Confusion matrix
+
+confusion_matrix = confusion_matrix(y_test, y_pred)
+print(confusion_matrix)
+
+# Other metrics
+
+print(classification_report(y_test, y_pred))
+
+## Metrics are so high because for this model, I am using predictors that are highly linearly correlated with home
+## team wins. Winner can be predicted with 100% accuracy when you use both home and away points. What predictors
+## do we want to use then, and will we pull those from season averages, or from where?
+
+## look at win pct, ranking file
+##
+
