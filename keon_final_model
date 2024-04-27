@@ -1,0 +1,233 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression # feature selection
+import statsmodels.api as sm
+from sklearn import metrics
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+
+
+
+games = pd.read_csv("C:/Users/Keon School/Downloads/nba games/games.csv")
+ranking = pd.read_csv('C:/Users/Keon School/Downloads/nba games/ranking.csv')
+teams = pd.read_csv('C:/Users/Keon School/Downloads/nba games/teams.csv')
+
+
+
+#print(games.isnull().sum())# 99 null values for some variables
+
+#print((games.isnull().sum()/(len(games)))*100) # very low percentage of null values, 0.37% for certain columns
+
+#for col in games.columns:
+#   print(col)
+
+
+#print(count) # 29 duplicate values of GAME_ID
+
+#print(games.GAME_ID.nunique()) # 26622
+#print(len(games)) #26651, 29 duplicate values of GAME_ID
+
+
+pie = games.duplicated(subset=['GAME_ID'], keep=False)
+
+count = 0
+
+for i in range(len(pie)):
+    if pie[i] == True:
+        #print(games['GAME_ID'][i], games['PTS_away'][i], games['PTS_home'][i])
+        count += 1
+
+#print(count)
+#print(pie[3102:3131])
+#print(games[3102:3131])
+
+games = games.drop_duplicates(subset=['GAME_ID'])
+
+games = games.drop(['GAME_STATUS_TEXT'], axis=1) #irrelevant columns to prediction, down to 19 columns
+games = games.drop(['TEAM_ID_home'], axis=1)
+games = games.drop(['TEAM_ID_away'], axis=1) # duplicate columns, down to 17
+
+
+#print(games.HOME_TEAM_ID.nunique()) 30 unique values
+#print(games.VISITOR_TEAM_ID.nunique()) 30 unique values
+pd.set_option('display.max_columns', None)
+
+#print(games.describe().T.apply(lambda x: x.apply('{0:.2f}'.format))) # home slightly higher than away for almost all statistical categories
+# mean of home team wins is 0.59, home wins a significant amount more
+
+data = [games['PTS_home'], games['PTS_away']]
+
+#bp = plt.boxplot(data)
+#plt.show()
+
+games = games.sort_values(by='GAME_DATE_EST').reset_index(drop = True)
+games = games.loc[games['GAME_DATE_EST'] >= "2004-01-01"].reset_index(drop=True)
+#print(games.isnull().values.any())
+#print(len(games)) length shortened to 26058
+
+teams = teams[['TEAM_ID', 'NICKNAME']]
+
+home_teams = teams.copy() # copy the names data
+home_teams.columns = ['HOME_TEAM_ID', 'NICKNAME']
+
+result_1 = pd.merge(games['HOME_TEAM_ID'], home_teams, how ="left", on="HOME_TEAM_ID")
+games['HOME_TEAM_ID'] = result_1['NICKNAME']
+
+# replace 'VISITOR_TEAM_ID' with names in df_names
+visitor_teams = teams.copy() # copy the names data
+visitor_teams.columns = ['VISITOR_TEAM_ID', 'NICKNAME'] # change the column names before merging
+# merge names according to df on "ID"
+result_2 = pd.merge(games['VISITOR_TEAM_ID'], visitor_teams, how = "left", on="VISITOR_TEAM_ID")
+games['VISITOR_TEAM_ID'] = result_2['NICKNAME']
+
+team_stats = teams.copy()
+cols = ['team_name', 'FG_PCT_ten', 'FT_PCT_ten', 'FG3_PCT_ten', 'AST_ten', 'REB_ten',
+        'FG_PCT_szn', 'FT_PCT_szn', 'FG3_PCT_szn', 'AST_szn', 'REB_szn']
+
+#print(games)
+
+home_df = games.groupby('HOME_TEAM_ID')
+visitor_df = games.groupby('VISITOR_TEAM_ID')
+
+def get_home_season_averages(df):
+    fg_pct = 0
+    ft_pct = 0
+    f3_pct = 0
+    ast_avg = 0
+    reb_avg = 0
+    averages = df.mean(numeric_only=True).round(2)
+    pts_avg = averages['PTS_home']
+    fg_pct = averages['FG_PCT_home']
+    ft_pct = averages['FT_PCT_home']
+    f3_pct = averages['FG3_PCT_home']
+    ast_avg = averages['AST_home']
+    reb_avg = averages['REB_home']
+    cols = ['pts_avg', 'fg_pct', 'ft_pct', 'f3_pct', 'ast_avg', 'reb_avg']
+    avg_list = [pts_avg, fg_pct, ft_pct, f3_pct, ast_avg, reb_avg]
+    avg_dict = dict(zip(cols, avg_list))
+    avg_df = pd.DataFrame([avg_dict])
+    year = df['SEASON'].iloc[0]
+    avg_df['year'] = year
+    team = df['HOME_TEAM_ID'].iloc[0]
+    avg_df['team'] = team
+    return avg_df
+
+def get_vis_season_averages(df):
+    fg_pct = 0
+    ft_pct = 0
+    f3_pct = 0
+    ast_avg = 0
+    reb_avg = 0
+    pts_avg = 0
+    averages = df.mean(numeric_only=True).round(2)
+    pts_avg = averages['PTS_away']
+    fg_pct = averages['FG_PCT_away']
+    ft_pct = averages['FT_PCT_away']
+    f3_pct = averages['FG3_PCT_away']
+    ast_avg = averages['AST_away']
+    reb_avg = averages['REB_away']
+    cols = ['pts_avg', 'fg_pct', 'ft_pct', 'f3_pct', 'ast_avg', 'reb_avg']
+    avg_list = [pts_avg, fg_pct, ft_pct, f3_pct, ast_avg, reb_avg]
+    avg_dict = dict(zip(cols, avg_list))
+    avg_df = pd.DataFrame([avg_dict])
+    year = df['SEASON'].iloc[0]
+    avg_df['year'] = year
+    team = df['VISITOR_TEAM_ID'].iloc[0]
+    avg_df['team'] = team
+    return avg_df
+
+#season_averages =
+
+home_avgs = pd.DataFrame()
+visitor_avgs = pd.DataFrame()
+
+for key, item in home_df:
+    home_team = home_df.get_group(key)['HOME_TEAM_ID'].iloc[1]
+    home_team_df = home_df.get_group(key)
+    home_team_by_year = home_team_df.groupby(['SEASON'])
+    for key, item in home_team_by_year:
+        home_team_df_final = home_team_by_year.get_group(key)
+        home_avgs = pd.concat([home_avgs, get_home_season_averages(home_team_df_final)])
+
+
+#print(home_avgs)
+
+for key, item in visitor_df:
+    visitor_team = visitor_df.get_group(key)['VISITOR_TEAM_ID'].iloc[1]
+    vis_team_df = visitor_df.get_group(key)
+    vis_team_by_year = vis_team_df.groupby(['SEASON'])
+    for key, item in vis_team_by_year:
+        vis_team_df_final = vis_team_by_year.get_group(key)
+        visitor_avgs = pd.concat([visitor_avgs, get_vis_season_averages(vis_team_df_final)])
+
+#for i in range(len(games)):
+#    cur_home_team = games.iloc[i]['HOME_TEAM_ID']
+#    cur_visitor_team = games.iloc[i]['VISITOR_TEAM_ID']
+
+home_avgs = home_avgs.rename(columns={'pts_avg': 'pts_avg_home', 'fg_pct': 'fg_avg_home', 'ft_pct': 'ft_avg_home', 'f3_pct': 'f3_avg_home',
+                                      'ast_avg': 'ast_avg_home', 'reb_avg': 'reb_avg_home', 'year': 'SEASON_PRED', 'team': 'HOME_TEAM_ID'})
+
+visitor_avgs = visitor_avgs.rename(columns={'pts_avg': 'pts_avg_visitor', 'fg_pct': 'fg_avg_visitor', 'ft_pct': 'ft_avg_visitor', 'f3_pct': 'f3_avg_visitor',
+                                      'ast_avg': 'ast_avg_visitor', 'reb_avg': 'reb_avg_visitor', 'year': 'SEASON_PRED', 'team': 'VISITOR_TEAM_ID'})
+
+games['SEASON_PRED'] = games['SEASON'] - 1
+
+games = pd.merge(games, home_avgs, on=['HOME_TEAM_ID', 'SEASON_PRED'], how='left')
+games = pd.merge(games, visitor_avgs, on=['VISITOR_TEAM_ID', 'SEASON_PRED'], how='left')
+
+games = games.drop(games[games['SEASON_PRED'] == 2002].index)
+games = games.loc[~((games['SEASON_PRED'] == 2003) & (games['HOME_TEAM_ID'] == 'Hornets'))]
+games = games.loc[~((games['SEASON_PRED'] == 2003) & (games['VISITOR_TEAM_ID'] == 'Hornets'))]
+
+
+#print(games)
+#print(home_avgs)
+#print(visitor_avgs)
+
+
+
+
+### Logistic Regression
+
+# Feature Engineering
+# Goal: If it is within the first X (ex. 20) games of a team's season, use last year's averages to compute predictive stats.
+#       if later in the season, use current averages of games leading up to the one played.
+#       Check kaggle sources for other strategies.
+
+#       variable: ex. fgpct_last_10, lists fg pct for the last ten games for each team. If we are before game 10 of the season,
+#       we use last season's averages (another set of variables).
+
+
+predictors=['fg_avg_home', 'ft_avg_home', 'f3_avg_home', 'ast_avg_home', 'reb_avg_home', 'pts_avg_home',
+            'fg_avg_visitor', 'ft_avg_visitor', 'f3_avg_visitor', 'ast_avg_visitor', 'reb_avg_visitor', 'pts_avg_visitor']
+X = games[predictors]
+y = games['HOME_TEAM_WINS']
+
+#print(games)
+
+logit_model = sm.Logit(y,X)
+result = logit_model.fit(method='bfgs')
+print(result.summary2())
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+print("X shape", X_train.shape, "y shape", y_train.shape)
+
+
+logreg = LogisticRegression()
+logreg.fit(X_train, y_train)
+
+y_pred = logreg.predict(X_test)
+print('Accuracy of logistic regression classifier on test set: {:.2f}'.format(logreg.score(X_test, y_test)))
+
+# Confusion matrix
+
+confusion_matrix = confusion_matrix(y_test, y_pred)
+print(confusion_matrix)
+
+# Other metrics
+
+print(classification_report(y_test, y_pred))
