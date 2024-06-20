@@ -1,2 +1,0 @@
-# SportsBetting
-Sports
